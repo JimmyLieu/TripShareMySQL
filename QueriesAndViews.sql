@@ -1,0 +1,176 @@
+drop view if exists all_restaurants_in_NYC, itineraries_to_france ,
+countries_visited_by_members, members_visited_US_and_another_country;
+-- View 01: Retrieve all the restaurants in New York city, US.
+CREATE VIEW all_restaurants_in_NYC AS
+SELECT r.RESTAURANT_NAME, d.COUNTRY, d.STATE, d.CITY
+FROM RESTAURANTS r
+INNER JOIN TRAVEL_ATTRACTION ta ON r.RESTAURANT_ATTRACTION = ta.DEST_ID_TA
+INNER JOIN DESTINATION d ON ta.DEST_ID_TA = d.DESTINATION_ID
+WHERE d.COUNTRY = 'United States' AND d.STATE = 'New York' AND d.CITY = 'New York';
+SELECT r.RESTAURANT_NAME, d.COUNTRY, d.STATE, d.CITY
+FROM RESTAURANTS r
+INNER JOIN TRAVEL_ATTRACTION ta ON r.RESTAURANT_ATTRACTION = ta.DEST_ID_TA
+INNER JOIN DESTINATION d ON ta.DEST_ID_TA = d.DESTINATION_ID
+WHERE d.COUNTRY = 'United States' AND d.STATE = 'New York' AND d.CITY = 'New York';
+-- View 02: Retrieve countries and the members who have visited them.
+CREATE VIEW countries_visited_by_members AS
+SELECT am.Username, d.Country
+FROM AUTHORIZED_MEMBER am
+INNER JOIN Destination d ON am.Visited_Destination = d.DESTINATION_ID
+WHERE am.Visited_Destination IS NOT NULL;
+SELECT am.Username, d.Country
+FROM AUTHORIZED_MEMBER am
+INNER JOIN Destination d ON am.Visited_Destination = d.DESTINATION_ID
+WHERE am.Visited_Destination IS NOT NULL;
+-- View 03: Retrieve itineraries to France.
+CREATE VIEW itineraries_to_france AS
+SELECT c.PLAN_ID, d.NAME, d.COUNTRY
+FROM COMPRISE_OF c
+JOIN DESTINATION d ON c.DESTINATION_ID = d.DESTINATION_ID
+JOIN TRIP t ON c.PLAN_ID = t.PLAN_ID
+WHERE d.COUNTRY = 'France';
+SELECT c.PLAN_ID, d.NAME, d.COUNTRY
+FROM COMPRISE_OF c
+JOIN DESTINATION d ON c.DESTINATION_ID = d.DESTINATION_ID
+JOIN TRIP t ON c.PLAN_ID = t.PLAN_ID
+WHERE d.COUNTRY = 'France';
+-- View 04: Retrieve the country(s) visited by whom also visits/visited the US on
+the same trip (within 15 days)
+-- CREATE VIEW members_visited_US_and_another_country AS
+CREATE VIEW members_visited_US_and_another_country AS
+SELECT DISTINCT c1.PLAN_ID, d2.COUNTRY
+FROM COMPRISE_OF c1
+JOIN COMPRISE_OF c2 ON c1.PLAN_ID = c2.PLAN_ID AND c1.DESTINATION_ID !=
+c2.DESTINATION_ID
+JOIN DESTINATION d1 ON c1.DESTINATION_ID = d1.DESTINATION_ID AND d1.COUNTRY LIKE
+'%united states%'
+JOIN DESTINATION d2 ON c2.DESTINATION_ID = d2.DESTINATION_ID
+JOIN TRIP t ON c1.PLAN_ID = t.PLAN_ID
+WHERE t.DURATION <= 15;
+SELECT DISTINCT c1.PLAN_ID, d2.COUNTRY
+FROM COMPRISE_OF c1
+JOIN COMPRISE_OF c2 ON c1.PLAN_ID = c2.PLAN_ID AND c1.DESTINATION_ID !=
+c2.DESTINATION_ID
+JOIN DESTINATION d1 ON c1.DESTINATION_ID = d1.DESTINATION_ID AND d1.COUNTRY LIKE
+'%united states%'
+JOIN DESTINATION d2 ON c2.DESTINATION_ID = d2.DESTINATION_ID
+JOIN TRIP t ON c1.PLAN_ID = t.PLAN_ID
+WHERE t.DURATION <= 15;
+-- query 1
+SELECT r.RESTAURANT_NAME, d.ADDRESS, r.PRICE_RANGE as ESTIMATED_PRICE
+FROM RESTAURANTS r
+INNER JOIN TRAVEL_ATTRACTION ta ON r.RESTAURANT_ATTRACTION = ta.DEST_ID_TA
+INNER JOIN DESTINATION d ON ta.DEST_ID_TA = d.DESTINATION_ID
+WHERE d.COUNTRY = 'United States' AND d.STATE = 'New York' AND d.CITY = 'New York'
+ORDER BY r.PRICE_RANGE
+LIMIT 3;
+-- query 2 Retrieve the username, status (regular or preferred), and ranking of the
+member who has uploaded the most pictures.
+SELECT a.USERNAME, a.MEMBER_STATUS, a.RANKING
+FROM AUTHORIZED_MEMBER a
+JOIN IMAGE p ON a.USERNAME = p.USERNAME
+GROUP BY a.USERNAME, a.MEMBER_STATUS, a.RANKING
+HAVING COUNT(*) = (SELECT COUNT(*) FROM IMAGE GROUP BY USERNAME ORDER BY COUNT(*)
+DESC LIMIT 1);
+-- query 3 For each country in the system, retrieve the username, address and the
+number of followers of the members who live in this country and have the most
+followers.
+SELECT a.COUNTRY, a.USERNAME, a.ADDRESS, a.NUMBER_OF_FOLLOWERS
+FROM AUTHORIZED_MEMBER a
+INNER JOIN (
+SELECT COUNTRY, MAX(NUMBER_OF_FOLLOWERS) AS MAX_FOLLOWERS
+FROM AUTHORIZED_MEMBER
+GROUP BY COUNTRY
+) b ON a.COUNTRY = b.COUNTRY AND a.NUMBER_OF_FOLLOWERS = b.MAX_FOLLOWERS;
+-- Query 4. Retrieve the names and countries of all preferred users who never
+visited the US.
+SELECT USERNAME, COUNTRY
+FROM AUTHORIZED_MEMBER
+WHERE MEMBER_STATUS = 'PREFERRED MEMBER'
+AND COUNTRY NOT LIKE 'UNITED STATES'
+AND USERNAME NOT IN (
+SELECT USERNAME
+FROM AUTHORIZED_MEMBER
+WHERE VISITED_DESTINATION IN (
+SELECT DESTINATION_ID
+FROM DESTINATION
+WHERE COUNTRY = 'UNITED STATES'
+)
+);
+-- query 5 For all country(s) visited by those who also visited the US on the same
+trip (within 15 days), retrieve the distinct names of the countries.
+SELECT DISTINCT c1.PLAN_ID, d2.COUNTRY
+FROM COMPRISE_OF c1
+JOIN COMPRISE_OF c2 ON c1.PLAN_ID = c2.PLAN_ID AND c1.DESTINATION_ID !=
+c2.DESTINATION_ID
+JOIN DESTINATION d1 ON c1.DESTINATION_ID = d1.DESTINATION_ID AND d1.COUNTRY LIKE
+'%united states%'
+JOIN DESTINATION d2 ON c2.DESTINATION_ID = d2.DESTINATION_ID
+JOIN TRIP t ON c1.PLAN_ID = t.PLAN_ID
+WHERE t.DURATION <= 15;
+-- query 6 Retrieve the contact information of the business owner who owns the most
+expensive restaurant and the owner who owns the most assets in the system.
+select b.OWNER_NAME,b.owner_phone_number, r.RESTAURANT_NAME,
+r.MOST_EXPENSIVE_RESTAURANT
+from BUSINESS_OWNER b
+join (select RESTAURANT_NAME, MAX(PRICE_RANGE) as MOST_EXPENSIVE_RESTAURANT
+from RESTAURANTS
+GROUP BY RESTAURANT_NAME) r on b.RESTAURANT_NAME = r.restaurant_NAME
+where r.MOST_EXPENSIVE_RESTAURANT = (select max(PRICE_RANGE)
+from restaurants);
+SELECT b.OWNER_NAME, b.OWNER_PHONE_NUMBER, count(distinct r.RESTAURANT_NAME) as
+NUM_OF_ASSETS
+FROM BUSINESS_OWNER b
+JOIN RESTAURANTS r ON b.OWNER_PHONE_NUMBER = r.OWNER_NUM
+GROUP BY b.OWNER_NAME, b.OWNER_PHONE_NUMBER
+order by NUM_OF_ASSETS desc
+limit 1;
+-- query 7 Retrieve the names of the 5 most desirable France cities to visit.
+Select City, Rating from Destination
+where Country = 'France'
+order by RATING
+limit 5;
+-- query 8 Retrieve the username and status of the member who either posted any
+comments or created any itinerary between 12/01/2018 and 1/31/2019.
+SELECT DISTINCT a.USERNAME, a.MEMBER_STATUS
+FROM AUTHORIZED_MEMBER a
+LEFT JOIN COMMENT c ON a.USERNAME = c.USERNAME AND c.DATE BETWEEN '2018-12-01' AND
+'2019-01-31'
+LEFT JOIN TRIP t ON a.USERNAME = t.CREATOR_MEM AND t.START_DATETIME BETWEEN '2018-
+12-01' AND '2019-01-31'
+WHERE c.USERNAME IS NOT NULL OR t.CREATOR_MEM IS NOT NULL;
+-- query 9
+SELECT t.creator_mem,
+MAX(t.potential_cost) AS max_daily_cost,
+MIN(t.potential_cost) AS min_daily_cost,
+AVG(t.potential_cost) AS avg_daily_cost
+FROM TRIP t
+INNER JOIN COMPRISE_OF c ON t.PLAN_ID = c.PLAN_ID
+INNER JOIN DESTINATION d ON c.DESTINATION_ID = d.DESTINATION_ID
+INNER JOIN (
+SELECT state
+FROM DESTINATION
+WHERE COUNTRY = 'France'
+GROUP BY state
+HAVING COUNT(DISTINCT city) = (SELECT COUNT(DISTINCT city) FROM DESTINATION WHERE
+COUNTRY = 'France')
+) AS fr_states ON d.STATE = fr_states.state
+GROUP BY t.creator_mem;
+-- Query 10
+SELECT d.COUNTRY,
+COUNT(DISTINCT c.USERNAME) AS TOTAL_COMMENTS,
+COUNT(DISTINCT t.PLAN_ID) AS TOTAL_ITINERARIES,
+COUNT(DISTINCT c.REPLIES_USER) AS TOTAL_USERS,
+COUNT(DISTINCT CASE WHEN d.COUNTRY = dm.COUNTRY THEN dm.USERNAME END) AS
+MEMBERS_VISITED
+FROM DESTINATION d
+LEFT JOIN TRIP t ON d.DESTINATION_ID = t.PLAN_ID
+LEFT JOIN COMMENT c ON c.REPLIES_USER = d.COUNTRY
+LEFT JOIN (
+SELECT DISTINCT am.USERNAME, d.COUNTRY
+FROM AUTHORIZED_MEMBER am
+JOIN DESTINATION d ON am.VISITED_DESTINATION = d.DESTINATION_ID AND am.COUNTRY
+= d.COUNTRY
+GROUP BY am.USERNAME, d.COUNTRY
+) AS dm ON d.COUNTRY = dm.COUNTRY
+GROUP BY d.COUNTRY;
